@@ -1,18 +1,18 @@
 {
   "$id": "/login.json",
   "type": "object",
+  "additionalProperties": false,
+  "required": ["login", "password"],
   "properties": {
     "login": {
       "type": "string",
-      "pattern": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
-      "errorMessage": "Please enter a valid email address"
+      "format": "email",
+      "errorMessage": "enter a valid email address"
     },
     "password": {
       "type": "string",
       "minLength": 6,
-      "maxLength": 1024,
-      "errorMessage": "Password must be six or more characters"
+      "maxLength": 1024
     }
-  },
-  "required": ["login", "password"]
+  }
 }

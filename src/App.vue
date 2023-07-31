@@ -6,38 +6,40 @@
         <label for="login">Email</label>
         <input
           v-model="formData.login"
-          :class="{ 'is-invalid': formColor(errors.login) }"
+          :class="{ 'is-invalid': isInvalid(errors.has('login')) }"
           @blur="onBlur"
           type="text"
           id="login"
           placeholder="Enter your email"
         />
-        <div class="error-wrapper">
-          <div style="color: red; font-size: 12px">
-            {{ errors.login }}
-          </div>
-        </div>
+        <ul class="error-wrapper">
+          <li v-for="errorMsg of errors.get('login')" :key="errorMsg">
+            {{ errorMsg }}
+          </li>
+        </ul>
       </div>
 
       <div class="form-group">
         <label for="password">Password</label>
         <input
           v-model="formData.password"
-          :class="{ 'is-invalid': formColor(errors.password) }"
+          :class="{ 'is-invalid': isInvalid(errors.has('password')) }"
           @blur="onBlur"
           type="password"
           id="password"
           placeholder="Enter your password"
         />
 
-        <div class="error-wrapper">
-          <div style="color: red; font-size: 12px">
-            {{ errors.password }}
-          </div>
-        </div>
+        <ul class="error-wrapper">
+          <li v-for="errorMsg of errors.get('password')" :key="errorMsg">
+            {{ errorMsg }}
+          </li>
+        </ul>
       </div>
 
-      <button type="submit" :disabled="isFormInvalid">Login</button>
+      <button type="submit" :disabled="errors.size > 0" @click="submit('ok')">
+        Login
+      </button>
     </form>
   </div>
 </template>
@@ -46,6 +48,7 @@
 import { defineComponent, ref, watch } from "vue";
 import login from "@/schemas/login.json";
 import Ajv from "ajv";
+import ajvFormats from "ajv-formats";
 import ajvErrors from "ajv-errors";
 
 export default defineComponent({
@@ -55,106 +58,70 @@ export default defineComponent({
       password: "",
     });
 
-    const ajv = new Ajv({ allErrors: true });
-    ajvErrors(ajv);
+    const opts = { allErrors: true };
+    const validator = ajvErrors(ajvFormats(new Ajv(opts)));
 
-    let validator = ajv;
-    validator.addSchema(login);
-
-    interface FormErrors {
-      [fieldName: string]: string[];
-    }
-
-    let errors = ref<FormErrors>({});
-    const isFormInvalid = ref(false);
-
+    let errors = ref<Map<string, string[]>>(new Map());
     watch(
       () => errors.value,
-      (newErrors: Record<string, string[]>) => {
-        isFormInvalid.value = Object.keys(newErrors).some(
-          (field) => newErrors[field].length > 0
-        );
-      },
-      { deep: true }
+      () => void 0
     );
 
     function onBlur(e: any) {
-      const isValid = validator.validate(
-        `/login.json#/properties/` + e.target.id,
-        e.target.value
-      );
-      const validationErrors =
-        validator.errors !== null ? validator.errors : {};
-      if (!isValid) {
-        if (validationErrors !== null && validationErrors !== undefined) {
-          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-          // @ts-ignore
-          validationErrors.forEach((error: any) => {
-            errors.value[e.target.id] = error.message;
-          });
-        } else {
-          errors.value = {};
-        }
-      } else {
-        errors.value = {};
+      const fieldName = e.target.id;
+      const fieldValue = e.target.value;
+      if (
+        validator.validate(`/login.json#/properties/${fieldName}`, fieldValue)
+      ) {
+        errors.value.delete(fieldName);
+      } else if (validator.errors?.length) {
+        errors.value.set(
+          fieldName,
+          validator.errors.map((e) => e.message) as string[]
+        );
       }
     }
 
     function onLogin() {
-      const isValid = validator.validate("/login.json", formData.value);
-      const validationErrors =
-        validator.errors !== null ? validator.errors : {};
-
-      if (!isValid) {
-        if (validationErrors !== null && validationErrors !== undefined) {
-          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-          // @ts-ignore
-          errors.value = validationErrors;
-          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-          // @ts-ignore
-          for (const error of validationErrors) {
-            const fieldName = error.instancePath.substring(1);
-
-            errors.value[fieldName] = error.message;
+      errors.value.clear();
+      if (validator.validate("/login.json", formData.value)) {
+        // valid, do nothing
+      } else if (validator.errors?.length) {
+        for (const [, e] of validator.errors.entries()) {
+          if (!e.message) {
+            continue;
           }
-        } else {
-          errors.value = {};
+          const fieldName = e.instancePath.substring(1);
+          const fieldErrors: string[] = errors.value.get(fieldName) || [];
+          fieldErrors.push(e.message);
+          errors.value.set(fieldName, fieldErrors);
         }
-      } else {
-        errors.value = {};
-
-        console.log("Login:", formData.value.login);
-        console.log("Password:", formData.value.password);
       }
     }
 
     function formColor(error: any) {
-      if (error) {
-        if (error.length) {
-          return true;
-        } else {
-          return false;
-        }
-      }
+      return error?.length;
+    }
+
+    function submit(text: string) {
+      alert(text);
     }
 
     return {
       formData,
       errors,
-      isFormInvalid,
-      formColor,
+      isInvalid: formColor,
       onBlur,
       onLogin,
+      submit,
     };
   },
 });
 </script>
 
 <style>
-@import url("https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600;700&display=swap");
-
 body {
-  font-family: "Open Sans";
+  font-family: sans-serif;
 }
 
 .login-form {
@@ -209,5 +176,12 @@ button:disabled {
 
 .is-invalid {
   border: 1px solid red;
+}
+
+.error-wrapper {
+  color: red;
+  font-size: 12px;
+  margin: 0;
+  padding: 0 20px;
 }
 </style>
