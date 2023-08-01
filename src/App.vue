@@ -37,9 +37,7 @@
         </ul>
       </div>
 
-      <button type="submit" :disabled="errors.size > 0" @click="submit('ok')">
-        Login
-      </button>
+      <button type="submit" :disabled="errors.size > 0">Login</button>
     </form>
   </div>
 </template>
@@ -60,6 +58,7 @@ export default defineComponent({
 
     const opts = { allErrors: true };
     const validator = ajvErrors(ajvFormats(new Ajv(opts)));
+    validator.addSchema(login);
 
     let errors = ref<Map<string, string[]>>(new Map());
     watch(
